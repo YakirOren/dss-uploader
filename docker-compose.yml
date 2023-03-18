@@ -1,0 +1,16 @@
+version: '3.0'
+
+services:
+  server:
+    env_file:
+      - .env
+    image: yakiroren/dss-uploader
+    build:
+      context: .
+      dockerfile: build/Dockerfile
+    networks:
+      - dss_network
+
+networks:
+  dss_network:
+    external: true
