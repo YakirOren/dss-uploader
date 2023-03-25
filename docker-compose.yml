@@ -13,4 +13,3 @@ services:
 
 networks:
   dss_network:
-    external: true

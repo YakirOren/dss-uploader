@@ -2,40 +2,77 @@ package server
 
 import (
 	"DSS-uploader/config"
-	"context"
-	kafka "github.com/segmentio/kafka-go"
+	"fmt"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/dustin/go-humanize"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Server struct {
-	shouldConsume bool
-	consumer      *kafka.Reader
+	Conn    *amqp.Connection
+	Channel *amqp.Channel
+	Queue   amqp.Queue
 }
 
-func NewServer(conf *config.Config) *Server {
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  []string{"kafka:9092"},
-		GroupID:  "mygroup",
-		Topic:    "mytopic",
-		MinBytes: 10e3, // 10KB
-		MaxBytes: 10e6, // 10MB
-	})
+func NewServer(conf *config.Config) (*Server, error) {
+	conn, err := amqp.Dial(conf.RabbitUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
+	}
+
+	channel, err := conn.Channel()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open a channel: %w", err)
+	}
+
+	queue, err := channel.QueueDeclare(
+		conf.QueueName, // name
+		true,           // durable
+		false,          // delete when unused
+		false,          // exclusive
+		false,          // no-wait
+		nil,            // arguments
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to declare a queue: %w", err)
+	}
 
 	return &Server{
-		shouldConsume: true,
-		consumer:      reader,
-	}
+		Conn:    conn,
+		Channel: channel,
+		Queue:   queue,
+	}, nil
 }
 
-func (server *Server) Run() {
-	defer server.consumer.Close()
+func (server *Server) Close() {
+	server.Channel.Close()
+	server.Conn.Close()
+}
 
-	for server.shouldConsume {
-		msg, err := server.consumer.ReadMessage(context.Background())
-		if err != nil {
-			log.Error(err)
-		} else {
-			log.Infof("message at topic:%v partition:%v offset:%v	%s = %s\n", msg.Topic, msg.Partition, msg.Offset, string(msg.Key), string(msg.Value))
-		}
+func (server *Server) Consume() {
+	msgs, err := server.Channel.Consume(
+		server.Queue.Name, // queue
+		"",                // consumer
+		false,             // auto-ack
+		false,             // exclusive
+		false,             // no-local
+		false,             // no-wait
+		nil,               // args
+	)
+
+	if err != nil {
+		log.Fatalf("could not start consumeing: %w", err)
 	}
+
+	var forever chan struct{}
+
+	for msg := range msgs {
+		log.Info(msg.Headers)
+		log.Info(humanize.IBytes(uint64(len(msg.Body))))
+
+		msg.Ack(false)
+	}
+
+	<-forever
 }

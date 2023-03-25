@@ -10,18 +10,21 @@ import (
 )
 
 func main() {
-	conf := new(config.Config)
+	conf := &config.Config{}
 	if err := env.Parse(conf); err != nil {
 		log.Fatal(err)
 	}
 
 	log.SetLevel(conf.LogLevel)
 
-	srv := server.NewServer(conf)
+	srv, err := server.NewServer(conf)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	app := fiber.New()
 
-	go srv.Run()
+	go srv.Consume()
 
 	setupRoute(app, srv)
 
