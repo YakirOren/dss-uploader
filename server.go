@@ -3,38 +3,63 @@ package main
 import (
 	"DSS-uploader/config"
 	"DSS-uploader/server"
+	discord_bot "DSS-uploader/upload/discord-bot"
 	"fmt"
-	"github.com/caarlos0/env"
+
+	"github.com/yakiroren/dss-common/db"
+
+	"github.com/caarlos0/env/v7"
+	"github.com/gofiber/adaptor/v2"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/hellofresh/health-go/v5"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
 	conf := &config.Config{}
-	if err := env.Parse(conf); err != nil {
+	opts := env.Options{UseFieldNameByDefault: true}
+
+	if err := env.Parse(conf, opts); err != nil {
 		log.Fatal(err)
 	}
 
 	log.SetLevel(conf.LogLevel)
 
-	srv, err := server.NewServer(conf)
+	store, err := db.NewMongoDataStore(&conf.Mongo)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client, err := discord_bot.New(store, conf.Discord)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	srv, err := server.NewServer(conf.Rabbit, client, store)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	app := fiber.New()
+	app.Use(recover.New())
+	app.Use(logger.New())
 
 	go srv.Consume()
 
-	setupRoute(app, srv)
+	h, _ := health.New(health.WithSystemInfo(), health.WithComponent(health.Component{
+		Name:    "Uploader",
+		Version: "v1",
+	}))
+
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.SendString("Hello from Uploader!")
+	})
+
+	app.Get("/status", adaptor.HTTPHandler(h.Handler()))
 
 	if err := app.Listen(fmt.Sprintf(":%s", conf.Port)); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func setupRoute(app *fiber.App, srv *server.Server) {
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString("Hello, World!")
-	})
 }
