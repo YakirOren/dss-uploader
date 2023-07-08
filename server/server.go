@@ -77,43 +77,57 @@ func (server *Server) Consume() {
 	var forever chan struct{}
 
 	for msg := range msgs {
-		go func(msg amqp.Delivery) {
-			fragmentNumber := msg.Headers["fragment_number"].(string)
-			id := msg.Headers["id"].(string)
-
-			log.Infof("Got fragment number %s for object %s", fragmentNumber, id)
-
-			err := server.upload.Upload(context.Background(), id, msg.Body, fragmentNumber)
-			if err != nil {
-				log.Error(err)
-				msg.Nack(false, true)
-				return
-			}
-
-			log.Infof("fragment %s object %s uploaded successfully", fragmentNumber, id)
-			msg.Ack(false)
-
-			hex, err := primitive.ObjectIDFromHex(id)
-			if err != nil {
-				log.Error(err)
-				return
-			}
-
-			metadata, found := server.dataStore.GetMetadataByID(context.Background(), hex)
-			if !found {
-				log.Error("Couldn't find object with id ", id)
-				return
-			}
-
-			if metadata.TotalFragments == len(metadata.Fragments) {
-				log.Info("setting ishidden to false")
-				err := server.dataStore.UpdateField(context.Background(), id, "ishidden", false)
-				if err != nil {
-					log.Error(err)
-				}
-			}
-		}(msg)
+		go server.consumeMessage(msg)
 	}
 
 	<-forever
+}
+
+func (server *Server) consumeMessage(msg amqp.Delivery) {
+	fragmentNumber := msg.Headers["fragment_number"].(string)
+	id := msg.Headers["id"].(string)
+
+	cl := log.WithFields(log.Fields{
+		"fragment_number": fragmentNumber,
+		"object_id":       id,
+	})
+
+	cl.Infof("Got fragment")
+	hex, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		cl.Error("invalid object id ", err)
+		DiscardMsg(msg, cl)
+
+		return
+	}
+
+	metadata, found := server.dataStore.GetMetadataByID(context.Background(), hex)
+	if !found {
+		cl.Error("Couldn't find object with id ", id)
+		DiscardMsg(msg, cl)
+		return
+	}
+
+	err = server.upload.Upload(context.Background(), id, msg.Body, fragmentNumber)
+	if err != nil {
+		cl.Error(err)
+		msg.Nack(false, true)
+		return
+	}
+
+	cl.Info("fragment uploaded successfully")
+	msg.Ack(false)
+
+	if metadata.TotalFragments == len(metadata.Fragments) {
+		cl.Info("setting ishidden to false")
+		err := server.dataStore.UpdateField(context.Background(), id, "ishidden", false)
+		if err != nil {
+			cl.Error(err)
+		}
+	}
+}
+
+func DiscardMsg(msg amqp.Delivery, logger *log.Entry) {
+	msg.Nack(false, false)
+	logger.Info("discarding message")
 }

@@ -10,8 +10,8 @@ require (
 	github.com/hellofresh/health-go/v5 v5.1.1
 	github.com/rabbitmq/amqp091-go v1.8.0
 	github.com/sirupsen/logrus v1.9.0
-	github.com/yakiroren/dss-common v0.0.0-00010101000000-000000000000
-	golang.org/x/sync v0.0.0-20220923202941-7f9b1623fab7
+	github.com/yakiroren/dss-common v0.1.1
+	go.mongodb.org/mongo-driver v1.11.3
 )
 
 require (
@@ -34,16 +34,15 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.44.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
+	github.com/wagslane/go-rabbitmq v0.12.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.1 // indirect
 	github.com/xdg-go/stringprep v1.0.3 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	go.mongodb.org/mongo-driver v1.11.3 // indirect
 	go.opentelemetry.io/otel v1.10.0 // indirect
 	go.opentelemetry.io/otel/trace v1.10.0 // indirect
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
+	golang.org/x/sync v0.0.0-20220923202941-7f9b1623fab7 // indirect
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	golang.org/x/text v0.3.8 // indirect
 )
-
-replace github.com/yakiroren/dss-common => /Users/yakiroren/Documents/dss-common

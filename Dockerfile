@@ -1,4 +1,4 @@
-FROM golang:1.17 AS base
+FROM golang:1.19 AS base
 
 WORKDIR UPLOADER
 ENV CGO_ENABLED=0
@@ -8,6 +8,7 @@ COPY go.* ./
 COPY server.go server.go
 COPY config config
 COPY server server
+COPY upload upload
 
 RUN go build -tags netgo -ldflags '-w -s -extldflags "-static"' -o /go/bin/uploader server.go
 
