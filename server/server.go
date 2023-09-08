@@ -6,8 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
-
 	"github.com/yakiroren/dss-common/db"
 
 	log "github.com/sirupsen/logrus"
@@ -93,23 +91,15 @@ func (server *Server) consumeMessage(msg amqp.Delivery) {
 	})
 
 	cl.Infof("Got fragment")
-	hex, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		cl.Error("invalid object id ", err)
-		DiscardMsg(msg, cl)
 
-		return
-	}
-
-	metadata, found := server.dataStore.GetMetadataByID(context.Background(), hex)
+	metadata, found := server.dataStore.GetMetadataByID(context.Background(), id)
 	if !found {
 		cl.Error("Couldn't find object with id ", id)
 		DiscardMsg(msg, cl)
 		return
 	}
 
-	err = server.upload.Upload(context.Background(), id, msg.Body, fragmentNumber)
-	if err != nil {
+	if err := server.upload.Upload(context.Background(), id, msg.Body, fragmentNumber); err != nil {
 		cl.Error(err)
 		msg.Nack(false, true)
 		return
@@ -118,7 +108,7 @@ func (server *Server) consumeMessage(msg amqp.Delivery) {
 	cl.Info("fragment uploaded successfully")
 	msg.Ack(false)
 
-	if metadata.TotalFragments == len(metadata.Fragments) {
+	if metadata.TotalFragments == len(metadata.Fragments)+1 {
 		cl.Info("setting ishidden to false")
 		err := server.dataStore.UpdateField(context.Background(), id, "ishidden", false)
 		if err != nil {
