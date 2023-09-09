@@ -22,7 +22,7 @@ type Server struct {
 }
 
 func NewServer(conf config.RabbitConfig, client upload.Client, dataStore db.DataStore) (*Server, error) {
-	conn, err := amqp.Dial(conf.RabbitUrl)
+	conn, err := amqp.Dial(conf.RabbitURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
@@ -41,7 +41,7 @@ func NewServer(conf config.RabbitConfig, client upload.Client, dataStore db.Data
 		nil,            // arguments
 	)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to declare a queue: %w", err)
+		return nil, fmt.Errorf("failed to declare a queue: %w", err)
 	}
 
 	return &Server{
@@ -69,7 +69,7 @@ func (server *Server) Consume() {
 		nil,               // args
 	)
 	if err != nil {
-		log.Fatalf("could not start consumeing: %w", err)
+		log.Fatalf("could not start consumeing: %v", err)
 	}
 
 	var forever chan struct{}
@@ -82,8 +82,8 @@ func (server *Server) Consume() {
 }
 
 func (server *Server) consumeMessage(msg amqp.Delivery) {
-	fragmentNumber := msg.Headers["fragment_number"].(string)
-	id := msg.Headers["id"].(string)
+	fragmentNumber, _ := msg.Headers["fragment_number"].(string)
+	id, _ := msg.Headers["id"].(string)
 
 	cl := log.WithFields(log.Fields{
 		"fragment_number": fragmentNumber,
@@ -101,12 +101,18 @@ func (server *Server) consumeMessage(msg amqp.Delivery) {
 
 	if err := server.upload.Upload(context.Background(), id, msg.Body, fragmentNumber); err != nil {
 		cl.Error(err)
-		msg.Nack(false, true)
+		if err2 := msg.Nack(false, true); err2 != nil {
+			cl.Error("failed to nack")
+		}
 		return
 	}
 
 	cl.Info("fragment uploaded successfully")
-	msg.Ack(false)
+
+	if err := msg.Ack(false); err != nil {
+		log.Error("server didnt receive ack")
+		return
+	}
 
 	if metadata.TotalFragments == len(metadata.Fragments)+1 {
 		cl.Info("setting ishidden to false")
@@ -118,6 +124,6 @@ func (server *Server) consumeMessage(msg amqp.Delivery) {
 }
 
 func DiscardMsg(msg amqp.Delivery, logger *log.Entry) {
-	msg.Nack(false, false)
+	_ = msg.Nack(false, false)
 	logger.Info("discarding message")
 }

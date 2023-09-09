@@ -1,16 +1,16 @@
-package discord_webhooks
+package webhooks
 
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/big"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/yakiroren/dss-common/models"
@@ -32,9 +32,9 @@ func New(dataStore db.DataStore, config DiscordWebhookConfig) (*DiscordWebhookCl
 }
 
 func (c *DiscordWebhookClient) Upload(ctx context.Context, path string, file []byte, fragmentID string) error {
-	// Choose a random webhook URL.
-	rand.Seed(time.Now().UnixNano())
-	webhookURL := c.webhookURLs[rand.Intn(len(c.webhookURLs))]
+	index, _ := rand.Int(rand.Reader, big.NewInt(int64(len(c.webhookURLs))))
+
+	webhookURL := c.webhookURLs[index.Int64()]
 
 	resp, err := c.upload(ctx, fragmentID, file, webhookURL)
 	if err != nil {
@@ -42,8 +42,8 @@ func (c *DiscordWebhookClient) Upload(ctx context.Context, path string, file []b
 	}
 
 	fragment := models.Fragment{
-		ChannelID: resp.ChannelId,
-		MessageID: resp.Attachments[0].Id,
+		ChannelID: resp.ChannelID,
+		MessageID: resp.Attachments[0].ID,
 		Name:      resp.Attachments[0].Filename,
 		Size:      resp.Attachments[0].Size,
 	}
@@ -59,14 +59,14 @@ func (c *DiscordWebhookClient) Upload(ctx context.Context, path string, file []b
 
 // MultipartBodyWithJSON returns the contentType and body for a discord request
 // data  : The object to encode for payload_json in the multipart request
-// files : Files to include in the request
-func MultipartBodyWithJSON(data interface{}, filename string, file []byte) (requestContentType string, requestBody []byte, err error) {
+// files : Files to include in the request.
+func MultipartBodyWithJSON(data interface{}, filename string, file []byte) (string, []byte, error) {
 	body := &bytes.Buffer{}
 	bodywriter := multipart.NewWriter(body)
 
 	payload, err := json.Marshal(data)
 	if err != nil {
-		return
+		return "", nil, err
 	}
 
 	var p io.Writer
@@ -77,11 +77,11 @@ func MultipartBodyWithJSON(data interface{}, filename string, file []byte) (requ
 
 	p, err = bodywriter.CreatePart(h)
 	if err != nil {
-		return
+		return "", nil, err
 	}
 
 	if _, err = p.Write(payload); err != nil {
-		return
+		return "", nil, err
 	}
 
 	h2 := make(textproto.MIMEHeader)
@@ -91,20 +91,23 @@ func MultipartBodyWithJSON(data interface{}, filename string, file []byte) (requ
 
 	p, err = bodywriter.CreatePart(h2)
 	if err != nil {
-		return
+		return "", nil, err
 	}
 
-	p.Write(file)
+	_, _ = p.Write(file)
 
 	err = bodywriter.Close()
 	if err != nil {
-		return
+		return "", nil, err
 	}
 
 	return bodywriter.FormDataContentType(), body.Bytes(), nil
 }
 
-func (c *DiscordWebhookClient) upload(ctx context.Context, filename string, file []byte, webhookURL string) (*DiscordResponse, error) {
+func (c *DiscordWebhookClient) upload(ctx context.Context,
+	filename string,
+	file []byte, webhookURL string,
+) (*DiscordResponse, error) {
 	contentType, body, err := MultipartBodyWithJSON(struct{}{}, filename, file)
 	if err != nil {
 		return nil, err
@@ -113,7 +116,7 @@ func (c *DiscordWebhookClient) upload(ctx context.Context, filename string, file
 	// Create a new HTTP POST request with the webhook URL.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
 	req.Header.Add("Content-Type", contentType)
@@ -122,7 +125,7 @@ func (c *DiscordWebhookClient) upload(ctx context.Context, filename string, file
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send HTTP request: %v", err)
+		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 	defer res.Body.Close()
 
@@ -132,7 +135,7 @@ func (c *DiscordWebhookClient) upload(ctx context.Context, filename string, file
 	}
 
 	result := &DiscordResponse{}
-	if err := json.NewDecoder(res.Body).Decode(result); err != nil {
+	if err = json.NewDecoder(res.Body).Decode(result); err != nil {
 		return nil, err
 	}
 

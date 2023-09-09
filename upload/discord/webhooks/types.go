@@ -1,25 +1,25 @@
-package discord_webhooks
+package webhooks
 
 import "time"
 
 type DiscordResponse struct {
-	Id        string `json:"id"`
+	ID        string `json:"id"`
 	Type      int    `json:"type"`
 	Content   string `json:"content"`
-	ChannelId string `json:"channel_id"`
+	ChannelID string `json:"channel_id"`
 	Author    struct {
 		Bot           bool        `json:"bot"`
-		Id            string      `json:"id"`
+		ID            string      `json:"id"`
 		Username      string      `json:"username"`
 		Avatar        interface{} `json:"avatar"`
 		Discriminator string      `json:"discriminator"`
 	} `json:"author"`
 	Attachments []struct {
-		Id          string `json:"id"`
+		ID          string `json:"id"`
 		Filename    string `json:"filename"`
 		Size        int    `json:"size"`
-		Url         string `json:"url"`
-		ProxyUrl    string `json:"proxy_url"`
+		URL         string `json:"url"`
+		ProxyURL    string `json:"proxy_url"`
 		Width       int    `json:"width"`
 		Height      int    `json:"height"`
 		ContentType string `json:"content_type"`
@@ -34,5 +34,5 @@ type DiscordResponse struct {
 	EditedTimestamp interface{}   `json:"edited_timestamp"`
 	Flags           int           `json:"flags"`
 	Components      []interface{} `json:"components"`
-	WebhookId       string        `json:"webhook_id"`
+	WebhookID       string        `json:"webhook_id"`
 }

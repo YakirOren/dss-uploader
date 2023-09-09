@@ -3,7 +3,7 @@ package main
 import (
 	"DSS-uploader/config"
 	"DSS-uploader/server"
-	discord_bot "DSS-uploader/upload/discord-bot"
+	discord "DSS-uploader/upload/discord/bot"
 	"fmt"
 
 	"github.com/yakiroren/dss-common/db"
@@ -32,7 +32,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	client, err := discord_bot.New(store, conf.Discord)
+	client, err := discord.New(store, conf.Discord)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,7 +42,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+	})
+
 	app.Use(recover.New())
 	app.Use(logger.New())
 
@@ -59,7 +62,7 @@ func main() {
 
 	app.Get("/status", adaptor.HTTPHandler(h.Handler()))
 
-	if err := app.Listen(fmt.Sprintf(":%s", conf.Port)); err != nil {
+	if err = app.Listen(fmt.Sprintf(":%s", conf.Port)); err != nil {
 		log.Fatal(err)
 	}
 }
