@@ -3,7 +3,7 @@ package main
 import (
 	"DSS-uploader/config"
 	"DSS-uploader/server"
-	discord "DSS-uploader/upload/discord/bot"
+	discord "DSS-uploader/upload/discord/webhooks"
 	"fmt"
 
 	"github.com/yakiroren/dss-common/db"

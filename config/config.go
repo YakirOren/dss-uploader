@@ -1,7 +1,7 @@
 package config
 
 import (
-	discord "DSS-uploader/upload/discord/bot"
+	discord "DSS-uploader/upload/discord/webhooks"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/yakiroren/dss-common/db"
@@ -17,5 +17,5 @@ type Config struct {
 	LogLevel log.Level `env:"LOG_LEVEL,required,notEmpty"`
 	Rabbit   RabbitConfig
 	Mongo    db.MongoConfig
-	Discord  discord.DiscordBotConfig
+	Discord  discord.DiscordWebhookConfig
 }
